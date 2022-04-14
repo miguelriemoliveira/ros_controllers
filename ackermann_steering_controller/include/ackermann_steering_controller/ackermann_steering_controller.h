@@ -46,6 +46,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <memory>
 #include <nav_msgs/Odometry.h>
+#include <ackermann_msgs/AckermannDriveStamped.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <tf/tfMessage.h>
@@ -124,6 +125,9 @@ namespace ackermann_steering_controller{
     Commands command_struct_;
     ros::Subscriber sub_command_;
 
+       /// Publisher tick counters of the motors
+    std::shared_ptr<realtime_tools::RealtimePublisher<ackermann_msgs::AckermannDriveStamped>>cmd_ackermann_drive_pub_;
+
     /// Odometry related:
     std::shared_ptr<realtime_tools::RealtimePublisher<nav_msgs::Odometry> > odom_pub_;
     std::shared_ptr<realtime_tools::RealtimePublisher<tf::tfMessage> > tf_odom_pub_;
@@ -154,6 +158,9 @@ namespace ackermann_steering_controller{
 
     /// Whether to publish odometry to tf or not:
     bool enable_odom_tf_;
+
+    /// Whether to publish ackermannDrive or not:
+    bool publish_ackermann_drive_;
 
     /// Number of wheel joints:
     size_t wheel_joints_size_;

@@ -119,6 +119,7 @@ namespace ackermann_steering_controller{
     , odom_frame_id_("odom")
     , enable_odom_tf_(true)
     , wheel_joints_size_(0)
+    , publish_ackermann_drive_(false)
   {
   }
 
@@ -147,6 +148,14 @@ namespace ackermann_steering_controller{
     std::string front_steer_name = "front_steer_joint";
     controller_nh.param("front_steer", front_steer_name, front_steer_name);
 
+    // Publish ackermannDrive message (speed and steering angle of the robot
+    controller_nh.param("publish_ackermann_drive", publish_ackermann_drive_, publish_ackermann_drive_);
+
+    // resets the ackermannDrive message
+    if (publish_ackermann_drive_)
+    {
+      cmd_ackermann_drive_pub_.reset(new realtime_tools::RealtimePublisher<ackermann_msgs::AckermannDriveStamped>(controller_nh, "ackermann_drive", 100));
+    }
 
     // Odometry related:
     double publish_rate;
@@ -276,6 +285,33 @@ namespace ackermann_steering_controller{
       odometry_.update(wheel_pos, steer_pos, time);
     }
 
+
+    // MOVE ROBOT
+    // Retreive current velocity command and time step:
+    Commands curr_cmd = *(command_.readFromRT());
+    const double dt = (time - curr_cmd.stamp).toSec();
+
+    // Brake if cmd_vel has timeout:
+    if (dt > cmd_vel_timeout_)
+    {
+      curr_cmd.lin = 0.0;
+      curr_cmd.ang = 0.0;
+    }
+
+    // Limit velocities and accelerations:
+    const double cmd_dt(period.toSec());
+
+    limiter_lin_.limit(curr_cmd.lin, last0_cmd_.lin, last1_cmd_.lin, cmd_dt);
+    limiter_ang_.limit(curr_cmd.ang, last0_cmd_.ang, last1_cmd_.ang, cmd_dt);
+
+    last1_cmd_ = last0_cmd_;
+    last0_cmd_ = curr_cmd;
+
+    // Set Command
+    const double wheel_vel = curr_cmd.lin/wheel_radius_; // omega = linear_vel / radius
+    rear_wheel_joint_.setCommand(wheel_vel);
+    front_steer_joint_.setCommand(curr_cmd.ang);
+
     // Publish odometry message
     if (last_state_publish_time_ + publish_period_ < time)
     {
@@ -306,33 +342,25 @@ namespace ackermann_steering_controller{
         odom_frame.transform.rotation = orientation;
         tf_odom_pub_->unlockAndPublish();
       }
+
+//      double steer_angle = front_steer_joint_.getCommand();
+//      double speed = rear_wheel_joint_.getCommand()/wheel_separation_h_;
+      double steer_angle = curr_cmd.ang;
+      double speed = curr_cmd.lin;
+
+      // Publish robot speed and steering angle
+      if (publish_ackermann_drive_ && cmd_ackermann_drive_pub_ && cmd_ackermann_drive_pub_->trylock())
+      {
+        cmd_ackermann_drive_pub_->msg_.header.stamp = time;
+        cmd_ackermann_drive_pub_->msg_.header.frame_id = base_frame_id_;
+        cmd_ackermann_drive_pub_->msg_.drive.speed = speed;
+        cmd_ackermann_drive_pub_->msg_.drive.steering_angle_velocity = 0.0;
+        cmd_ackermann_drive_pub_->msg_.drive.steering_angle = steer_angle;
+        cmd_ackermann_drive_pub_->msg_.drive.acceleration = 0;
+        cmd_ackermann_drive_pub_->msg_.drive.jerk = 0;
+        cmd_ackermann_drive_pub_->unlockAndPublish();
+      }
     }
-
-    // MOVE ROBOT
-    // Retreive current velocity command and time step:
-    Commands curr_cmd = *(command_.readFromRT());
-    const double dt = (time - curr_cmd.stamp).toSec();
-
-    // Brake if cmd_vel has timeout:
-    if (dt > cmd_vel_timeout_)
-    {
-      curr_cmd.lin = 0.0;
-      curr_cmd.ang = 0.0;
-    }
-
-    // Limit velocities and accelerations:
-    const double cmd_dt(period.toSec());
-
-    limiter_lin_.limit(curr_cmd.lin, last0_cmd_.lin, last1_cmd_.lin, cmd_dt);
-    limiter_ang_.limit(curr_cmd.ang, last0_cmd_.ang, last1_cmd_.ang, cmd_dt);
-
-    last1_cmd_ = last0_cmd_;
-    last0_cmd_ = curr_cmd;
-
-    // Set Command
-    const double wheel_vel = curr_cmd.lin/wheel_radius_; // omega = linear_vel / radius
-    rear_wheel_joint_.setCommand(wheel_vel);
-    front_steer_joint_.setCommand(curr_cmd.ang);
 
   }
 
