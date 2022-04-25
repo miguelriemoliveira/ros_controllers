@@ -343,8 +343,8 @@ namespace ackermann_steering_controller{
         tf_odom_pub_->unlockAndPublish();
       }
 
-      double steer_angle = front_steer_joint_.getCommand();
-      double speed = rear_wheel_joint_.getCommand() * wheel_radius_;
+      double steer_angle = odometry_.getAngular();
+      double speed = odometry_.getLinear();
 //      double steer_angle = curr_cmd.ang;
 //      double speed = curr_cmd.lin;
 
