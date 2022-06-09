@@ -343,7 +343,7 @@ namespace ackermann_steering_controller{
         tf_odom_pub_->unlockAndPublish();
       }
 
-      double steer_angle = odometry_.getAngular();
+      double steer_velocity = odometry_.getAngular();
       double speed = odometry_.getLinear();
 //      double steer_angle = curr_cmd.ang;
 //      double speed = curr_cmd.lin;
@@ -354,8 +354,8 @@ namespace ackermann_steering_controller{
         cmd_ackermann_drive_pub_->msg_.header.stamp = time;
         cmd_ackermann_drive_pub_->msg_.header.frame_id = base_frame_id_;
         cmd_ackermann_drive_pub_->msg_.drive.speed = speed;
-        cmd_ackermann_drive_pub_->msg_.drive.steering_angle_velocity = 0.0;
-        cmd_ackermann_drive_pub_->msg_.drive.steering_angle = steer_angle;
+        cmd_ackermann_drive_pub_->msg_.drive.steering_angle_velocity = steer_velocity;
+        cmd_ackermann_drive_pub_->msg_.drive.steering_angle = steer_pos;
         cmd_ackermann_drive_pub_->msg_.drive.acceleration = 0;
         cmd_ackermann_drive_pub_->msg_.drive.jerk = 0;
         cmd_ackermann_drive_pub_->unlockAndPublish();
